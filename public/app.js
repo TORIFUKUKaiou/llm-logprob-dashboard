@@ -75,6 +75,18 @@ function probabilityFromLogprob(logprob) {
   return Math.exp(logprob);
 }
 
+async function sha256Hex(value) {
+  if (!window.crypto || !window.crypto.subtle) {
+    throw new Error('Web Crypto API is not available in this browser.');
+  }
+
+  const encoded = new TextEncoder().encode(value);
+  const digest = await window.crypto.subtle.digest('SHA-256', encoded);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 function updateTableSelection() {
   const rows = tokenTableBody.querySelectorAll('tr[data-token-index]');
   rows.forEach((row) => {
@@ -396,15 +408,19 @@ function renderResult(payload, temperature) {
 }
 
 async function requestGeneration(prompt, temperature) {
+  const requestBody = JSON.stringify({
+    prompt,
+    temperature
+  });
+  const bodySha256 = await sha256Hex(requestBody);
+
   const response = await fetch('/api/generate', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'x-amz-content-sha256': bodySha256
     },
-    body: JSON.stringify({
-      prompt,
-      temperature
-    })
+    body: requestBody
   });
 
   let payload = null;
