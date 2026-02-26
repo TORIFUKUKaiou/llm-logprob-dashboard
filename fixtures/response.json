@@ -1,0 +1,501 @@
+{
+  "id": "resp_09d254539f72781a00699fb0ab88d88190b2ef6a7b740ea74d",
+  "object": "response",
+  "created_at": 1772073131,
+  "status": "completed",
+  "background": false,
+  "billing": {
+    "payer": "developer"
+  },
+  "completed_at": 1772073133,
+  "error": null,
+  "frequency_penalty": 0,
+  "incomplete_details": null,
+  "instructions": null,
+  "max_output_tokens": null,
+  "max_tool_calls": null,
+  "model": "gpt-4o-mini-2024-07-18",
+  "output": [
+    {
+      "id": "msg_09d254539f72781a00699fb0ac6984819095d76b77d4946b68",
+      "type": "message",
+      "status": "completed",
+      "content": [
+        {
+          "type": "output_text",
+          "annotations": [],
+          "logprobs": [
+            {
+              "bytes": [
+                65
+              ],
+              "logprob": -0.004088,
+              "token": "A",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                108,
+                111,
+                103
+              ],
+              "logprob": -0.00006,
+              "token": " log",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                112,
+                114,
+                111,
+                98
+              ],
+              "logprob": -0.10172,
+              "token": "prob",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                44
+              ],
+              "logprob": -0.001398,
+              "token": ",",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                111,
+                114
+              ],
+              "logprob": -0.011048,
+              "token": " or",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                108,
+                111,
+                103,
+                97,
+                114,
+                105,
+                116,
+                104
+              ],
+              "logprob": -0.126959,
+              "token": " logarith",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                109,
+                105,
+                99
+              ],
+              "logprob": -0.014164,
+              "token": "mic",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                112,
+                114,
+                111,
+                98,
+                97,
+                98,
+                105,
+                108,
+                105,
+                116,
+                121
+              ],
+              "logprob": -0.000005,
+              "token": " probability",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                44
+              ],
+              "logprob": 0,
+              "token": ",",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                105,
+                115
+              ],
+              "logprob": -0.040661,
+              "token": " is",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                116,
+                104,
+                101
+              ],
+              "logprob": -0.01251,
+              "token": " the",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                108,
+                111,
+                103,
+                97,
+                114,
+                105,
+                116,
+                104
+              ],
+              "logprob": -0.062102,
+              "token": " logarith",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                109
+              ],
+              "logprob": -0.000431,
+              "token": "m",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                111,
+                102
+              ],
+              "logprob": -0.005236,
+              "token": " of",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                97
+              ],
+              "logprob": -0.061979,
+              "token": " a",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                112,
+                114,
+                111,
+                98,
+                97,
+                98,
+                105,
+                108,
+                105,
+                116,
+                121
+              ],
+              "logprob": -0.000113,
+              "token": " probability",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                118,
+                97,
+                108,
+                117,
+                101
+              ],
+              "logprob": -0.000552,
+              "token": " value",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                44
+              ],
+              "logprob": -0.024568,
+              "token": ",",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                111,
+                102,
+                116,
+                101,
+                110
+              ],
+              "logprob": -0.168508,
+              "token": " often",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                117,
+                115,
+                101,
+                100
+              ],
+              "logprob": -0.000645,
+              "token": " used",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                105,
+                110
+              ],
+              "logprob": -0.449538,
+              "token": " in",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                115,
+                116,
+                97,
+                116,
+                105,
+                115,
+                116,
+                105,
+                99,
+                97,
+                108
+              ],
+              "logprob": -0.619217,
+              "token": " statistical",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                109,
+                111,
+                100,
+                101,
+                108,
+                115
+              ],
+              "logprob": -1.528608,
+              "token": " models",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                116,
+                111
+              ],
+              "logprob": -0.351414,
+              "token": " to",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                115,
+                105,
+                109,
+                112,
+                108,
+                105,
+                102,
+                121
+              ],
+              "logprob": -0.041869,
+              "token": " simplify",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                99,
+                97,
+                108,
+                99,
+                117,
+                108,
+                97,
+                116,
+                105,
+                111,
+                110,
+                115
+              ],
+              "logprob": -0.180977,
+              "token": " calculations",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                97,
+                110,
+                100
+              ],
+              "logprob": -0.362334,
+              "token": " and",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                104,
+                97,
+                110,
+                100,
+                108,
+                101
+              ],
+              "logprob": -0.696341,
+              "token": " handle",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                118,
+                101,
+                114,
+                121
+              ],
+              "logprob": -0.016391,
+              "token": " very",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                115,
+                109,
+                97,
+                108,
+                108
+              ],
+              "logprob": -0.000037,
+              "token": " small",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                112,
+                114,
+                111,
+                98,
+                97,
+                98,
+                105,
+                108,
+                105,
+                116,
+                105,
+                101,
+                115
+              ],
+              "logprob": -1.262943,
+              "token": " probabilities",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                109,
+                111,
+                114,
+                101
+              ],
+              "logprob": -0.305508,
+              "token": " more",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                32,
+                101,
+                102,
+                102,
+                101,
+                99,
+                116,
+                105,
+                118,
+                101,
+                108,
+                121
+              ],
+              "logprob": -0.208074,
+              "token": " effectively",
+              "top_logprobs": []
+            },
+            {
+              "bytes": [
+                46
+              ],
+              "logprob": -0.007181,
+              "token": ".",
+              "top_logprobs": []
+            }
+          ],
+          "text": "A logprob, or logarithmic probability, is the logarithm of a probability value, often used in statistical models to simplify calculations and handle very small probabilities more effectively."
+        }
+      ],
+      "role": "assistant"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "presence_penalty": 0,
+  "previous_response_id": null,
+  "prompt_cache_key": null,
+  "prompt_cache_retention": null,
+  "reasoning": {
+    "effort": null,
+    "summary": null
+  },
+  "safety_identifier": null,
+  "service_tier": "default",
+  "store": true,
+  "temperature": 0.7,
+  "text": {
+    "format": {
+      "type": "text"
+    },
+    "verbosity": "medium"
+  },
+  "tool_choice": "auto",
+  "tools": [],
+  "top_logprobs": 0,
+  "top_p": 1,
+  "truncation": "disabled",
+  "usage": {
+    "input_tokens": 17,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 35,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 52
+  },
+  "user": null,
+  "metadata": {}
+}

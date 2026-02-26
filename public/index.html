@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LLM Logprob Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="shape shape-a" aria-hidden="true"></div>
+    <div class="shape shape-b" aria-hidden="true"></div>
+    <div class="shape shape-c" aria-hidden="true"></div>
+
+    <header class="hero">
+      <p class="hero-kicker">TOKEN CONFIDENCE LAB</p>
+      <h1 class="hero-title">LLM Logprob Dashboard</h1>
+      <p class="hero-copy">
+        Prompt once. See every token's confidence. Spot uncertainty instantly.
+      </p>
+    </header>
+
+    <main class="layout">
+      <section class="panel control-panel">
+        <h2 class="panel-title">Generate And Inspect</h2>
+        <form id="generate-form" class="control-form">
+          <label class="field-label" for="prompt-input">Prompt</label>
+          <textarea
+            id="prompt-input"
+            class="prompt-input"
+            placeholder="Ask the model anything..."
+            rows="7"
+            required
+          ></textarea>
+
+          <div class="temperature-block">
+            <div class="temperature-head">
+              <label class="field-label" for="temperature-input">Temperature</label>
+              <span id="temperature-value" class="temperature-value">0.7</span>
+            </div>
+            <input
+              id="temperature-input"
+              class="temperature-input"
+              type="range"
+              min="0"
+              max="2"
+              step="0.1"
+              value="0.7"
+            />
+          </div>
+
+          <div class="button-row">
+            <button id="generate-button" type="submit" class="btn btn-primary">
+              Generate + Analyze
+            </button>
+            <button id="clear-history-button" type="button" class="btn btn-secondary">
+              Clear History
+            </button>
+          </div>
+        </form>
+
+        <p id="status-message" class="status status-info" aria-live="polite">
+          Ready.
+        </p>
+      </section>
+
+      <section id="results-section" class="panel results-panel is-hidden">
+        <h2 class="panel-title">Latest Result</h2>
+
+        <div class="metric-grid">
+          <article class="metric-card metric-card-main">
+            <h3 class="metric-label">Perplexity</h3>
+            <p id="perplexity-value" class="metric-value">--</p>
+          </article>
+
+          <article class="metric-card">
+            <h3 class="metric-label">Average Logprob</h3>
+            <p id="average-logprob-value" class="metric-value metric-value-small">--</p>
+          </article>
+
+          <article class="metric-card">
+            <h3 class="metric-label">Token Count</h3>
+            <p id="token-count-value" class="metric-value metric-value-small">--</p>
+          </article>
+        </div>
+
+        <div class="result-grid">
+          <article class="result-card">
+            <h3 class="card-title">Generated Text</h3>
+            <pre id="generated-text" class="generated-text">-</pre>
+          </article>
+
+          <article class="result-card">
+            <h3 class="card-title">Run Meta</h3>
+            <dl class="meta-list">
+              <div class="meta-row">
+                <dt>Model</dt>
+                <dd id="meta-model">-</dd>
+              </div>
+              <div class="meta-row">
+                <dt>Temperature</dt>
+                <dd id="meta-temperature">-</dd>
+              </div>
+            </dl>
+          </article>
+        </div>
+
+        <article class="result-card chart-card">
+          <h3 class="card-title">Logprob Trend</h3>
+          <div class="chart-wrap">
+            <canvas id="logprob-chart"></canvas>
+          </div>
+        </article>
+
+        <article class="result-card table-card">
+          <h3 class="card-title">Token Logprob Table</h3>
+          <div class="table-wrap">
+            <table class="token-table">
+              <thead>
+                <tr>
+                  <th>Index</th>
+                  <th>Token</th>
+                  <th>Logprob</th>
+                </tr>
+              </thead>
+              <tbody id="token-table-body"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="result-card top-logprobs-card">
+          <h3 class="card-title">Top Logprobs Explorer</h3>
+          <p class="top-logprobs-hint">
+            Click a token row or chart point to inspect alternative token candidates.
+          </p>
+          <div id="top-logprobs-empty" class="top-logprobs-empty">
+            Select a token to view alternatives.
+          </div>
+          <div id="top-logprobs-content" class="top-logprobs-content is-hidden">
+            <div class="top-logprobs-summary">
+              <p class="summary-label">Selected Token</p>
+              <p id="selected-token-text" class="summary-token">-</p>
+              <p id="selected-token-meta" class="summary-meta">-</p>
+            </div>
+            <div id="top-logprobs-list" class="top-logprobs-list"></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel history-panel">
+        <h2 class="panel-title">Recent Runs</h2>
+        <div id="history-list" class="history-list"></div>
+      </section>
+    </main>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"
+    ></script>
+    <script src="app.js"></script>
+  </body>
+</html>
