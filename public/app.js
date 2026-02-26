@@ -13,6 +13,8 @@ const averageLogprobValue = document.getElementById('average-logprob-value');
 const tokenCountValue = document.getElementById('token-count-value');
 const metaModel = document.getElementById('meta-model');
 const metaTemperature = document.getElementById('meta-temperature');
+const metaMaxOutputTokens = document.getElementById('meta-max-output-tokens');
+const metaLogprobCoverage = document.getElementById('meta-logprob-coverage');
 const tokenTableBody = document.getElementById('token-table-body');
 const historyList = document.getElementById('history-list');
 const topLogprobsEmpty = document.getElementById('top-logprobs-empty');
@@ -86,6 +88,68 @@ function toFiniteNumber(value, fallback = null) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function calculateLogprobCoverage(generatedText, tokens) {
+  const totalChars = typeof generatedText === 'string' ? generatedText.length : 0;
+  const coveredChars = Array.isArray(tokens)
+    ? tokens.reduce(
+        (total, tokenEntry) =>
+          total + (tokenEntry && typeof tokenEntry.token === 'string' ? tokenEntry.token.length : 0),
+        0
+      )
+    : 0;
+  const normalizedCoveredChars = totalChars > 0 ? Math.min(coveredChars, totalChars) : 0;
+  const ratio = totalChars > 0 ? normalizedCoveredChars / totalChars : null;
+
+  return {
+    coveredChars: normalizedCoveredChars,
+    totalChars,
+    ratio
+  };
+}
+
+function normalizeCoverage(coverage, generatedText, tokens) {
+  const fallback = calculateLogprobCoverage(generatedText, tokens);
+  if (!coverage || typeof coverage !== 'object') {
+    return fallback;
+  }
+
+  const coveredChars = toFiniteNumber(coverage.coveredChars, fallback.coveredChars);
+  const totalChars = toFiniteNumber(coverage.totalChars, fallback.totalChars);
+  const ratio = toFiniteNumber(coverage.ratio, null);
+  const normalizedCoveredChars = Math.max(0, Math.floor(coveredChars));
+  const normalizedTotalChars = Math.max(0, Math.floor(totalChars));
+  const normalizedRatio = normalizedTotalChars > 0
+    ? (ratio !== null ? Math.max(0, Math.min(1, ratio)) : normalizedCoveredChars / normalizedTotalChars)
+    : null;
+
+  return {
+    coveredChars: normalizedTotalChars > 0
+      ? Math.min(normalizedCoveredChars, normalizedTotalChars)
+      : 0,
+    totalChars: normalizedTotalChars,
+    ratio: normalizedRatio
+  };
+}
+
+function formatCoverage(coverage) {
+  if (!coverage || typeof coverage !== 'object') {
+    return '-';
+  }
+
+  const totalChars = toFiniteNumber(coverage.totalChars, 0);
+  const coveredChars = toFiniteNumber(coverage.coveredChars, 0);
+  if (!Number.isFinite(totalChars) || totalChars <= 0) {
+    return '-';
+  }
+
+  const ratio = toFiniteNumber(coverage.ratio, coveredChars / totalChars);
+  const percentage = Math.max(0, Math.min(100, ratio * 100));
+  const normalizedCovered = Math.max(0, Math.min(Math.floor(coveredChars), Math.floor(totalChars)));
+  const normalizedTotal = Math.max(0, Math.floor(totalChars));
+
+  return `${percentage.toFixed(1)}% (${normalizedCovered}/${normalizedTotal} chars)`;
+}
+
 function normalizeStoredPayload(payload) {
   if (!payload || typeof payload !== 'object') {
     return null;
@@ -135,19 +199,30 @@ function normalizeStoredPayload(payload) {
 
   const averageLogprob = toFiniteNumber(payload.statistics && payload.statistics.averageLogprob, null);
   const perplexity = toFiniteNumber(payload.statistics && payload.statistics.perplexity, null);
+  const generatedTextValue = typeof payload.generatedText === 'string' ? payload.generatedText : '';
   const model = payload.meta && typeof payload.meta.model === 'string'
     ? payload.meta.model
     : '-';
+  const maxOutputTokens = Number.isInteger(toFiniteNumber(payload.meta && payload.meta.maxOutputTokens, null))
+    ? Number(payload.meta.maxOutputTokens)
+    : null;
+  const logprobCoverage = normalizeCoverage(
+    payload.meta && payload.meta.logprobCoverage,
+    generatedTextValue,
+    tokens
+  );
 
   return {
-    generatedText: typeof payload.generatedText === 'string' ? payload.generatedText : '',
+    generatedText: generatedTextValue,
     tokens,
     statistics: {
       averageLogprob,
       perplexity
     },
     meta: {
-      model
+      model,
+      maxOutputTokens,
+      logprobCoverage
     }
   };
 }
@@ -552,13 +627,28 @@ function revealResults() {
 function renderResult(payload, temperature) {
   currentTokens = Array.isArray(payload.tokens) ? payload.tokens : [];
   selectedTokenIndex = null;
+  const statistics = payload && typeof payload.statistics === 'object'
+    ? payload.statistics
+    : {};
+  const meta = payload && typeof payload.meta === 'object'
+    ? payload.meta
+    : {};
+  const coverage = normalizeCoverage(
+    meta.logprobCoverage,
+    payload.generatedText || '',
+    currentTokens
+  );
 
   generatedText.textContent = payload.generatedText || '';
-  perplexityValue.textContent = formatNumber(payload.statistics.perplexity, 2);
-  averageLogprobValue.textContent = formatNumber(payload.statistics.averageLogprob, 4);
+  perplexityValue.textContent = formatNumber(statistics.perplexity, 2);
+  averageLogprobValue.textContent = formatNumber(statistics.averageLogprob, 4);
   tokenCountValue.textContent = String(currentTokens.length);
-  metaModel.textContent = payload.meta.model || '-';
+  metaModel.textContent = typeof meta.model === 'string' ? meta.model : '-';
   metaTemperature.textContent = formatNumber(temperature, 1);
+  metaMaxOutputTokens.textContent = Number.isInteger(meta.maxOutputTokens)
+    ? String(meta.maxOutputTokens)
+    : '-';
+  metaLogprobCoverage.textContent = formatCoverage(coverage);
 
   renderTokenTable(currentTokens);
   renderChart(currentTokens);

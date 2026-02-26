@@ -4,6 +4,7 @@ const assert = require('node:assert');
 const {
   callOpenAIResponses,
   DEFAULT_MODEL,
+  DEFAULT_MAX_OUTPUT_TOKENS,
   DEFAULT_TOP_LOGPROBS,
   LOGPROB_INCLUDE_PATH,
   OPENAI_RESPONSES_ENDPOINT
@@ -39,6 +40,7 @@ describe('callOpenAIResponses', () => {
     assert.strictEqual(body.model, DEFAULT_MODEL);
     assert.strictEqual(body.temperature, 0.3);
     assert.strictEqual(body.top_logprobs, DEFAULT_TOP_LOGPROBS);
+    assert.strictEqual(body.max_output_tokens, DEFAULT_MAX_OUTPUT_TOKENS);
     assert.deepStrictEqual(body.include, [LOGPROB_INCLUDE_PATH]);
     assert.deepStrictEqual(body.input, [
       {
@@ -62,11 +64,13 @@ describe('callOpenAIResponses', () => {
     await callOpenAIResponses('test prompt', 0.7, {
       apiKey: 'test-key',
       fetchImpl: mockFetch,
-      topLogprobs: 8
+      topLogprobs: 8,
+      maxOutputTokens: 123
     });
 
     const body = JSON.parse(capturedOptions.body);
     assert.strictEqual(body.top_logprobs, 8);
+    assert.strictEqual(body.max_output_tokens, 123);
   });
 
   it('throws CONFIG_ERROR when API key is missing', async () => {

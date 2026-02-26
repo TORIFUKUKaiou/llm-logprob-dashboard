@@ -66,8 +66,16 @@ describe('lambda/api-handler', () => {
     assert.strictEqual(response.statusCode, 200);
     assert.strictEqual(payload.meta.model, 'gpt-4o-mini');
     assert.strictEqual(payload.meta.temperature, 0.4);
+    assert.strictEqual(payload.meta.maxOutputTokens, 220);
+    assert.deepStrictEqual(Object.keys(payload.meta.logprobCoverage), [
+      'coveredChars',
+      'totalChars',
+      'ratio'
+    ]);
+    assert.strictEqual(typeof payload.meta.logprobCoverage.ratio, 'number');
     assert.ok(Array.isArray(payload.tokens));
     assert.strictEqual(capturedBody.top_logprobs, 5);
+    assert.strictEqual(capturedBody.max_output_tokens, 220);
   });
 
   it('returns VALIDATION_ERROR when prompt is empty', async () => {

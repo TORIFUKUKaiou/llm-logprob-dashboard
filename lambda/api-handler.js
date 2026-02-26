@@ -2,6 +2,7 @@ const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const DEFAULT_TEMPERATURE = 0.7;
 const MIN_TEMPERATURE = 0.0;
 const MAX_TEMPERATURE = 2.0;
+const MAX_OUTPUT_TOKENS = parsePositiveInteger(process.env.MAX_OUTPUT_TOKENS, 220);
 const TOP_LOGPROBS = Number.isInteger(Number(process.env.TOP_LOGPROBS))
   ? Number(process.env.TOP_LOGPROBS)
   : 5;
@@ -10,6 +11,11 @@ const LOGPROB_INCLUDE_PATH = 'message.output_text.logprobs';
 
 function buildAppError(type, message, status) {
   return { type, message, status };
+}
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function roundTo(value, digits) {
@@ -183,11 +189,27 @@ function extractLogprobs(openaiResponse) {
       };
     });
 
+    const coveredChars = tokens.reduce((total, tokenEntry) => {
+      return total + (typeof tokenEntry.token === 'string' ? tokenEntry.token.length : 0);
+    }, 0);
+    const totalChars = generatedText.length;
+    const normalizedCoveredChars = totalChars > 0
+      ? Math.min(coveredChars, totalChars)
+      : 0;
+    const coverageRatio = totalChars > 0
+      ? roundTo(normalizedCoveredChars / totalChars, 4)
+      : null;
+
     return {
       success: true,
       text: generatedText,
       tokens,
-      statistics: calculateStatisticsFromValues(rawLogprobValues)
+      statistics: calculateStatisticsFromValues(rawLogprobValues),
+      coverage: {
+        coveredChars: normalizedCoveredChars,
+        totalChars,
+        ratio: coverageRatio
+      }
     };
   } catch (error) {
     return {
@@ -213,7 +235,8 @@ async function callOpenAIResponses(prompt, temperature) {
     ],
     temperature,
     include: [LOGPROB_INCLUDE_PATH],
-    top_logprobs: TOP_LOGPROBS
+    top_logprobs: TOP_LOGPROBS,
+    max_output_tokens: MAX_OUTPUT_TOKENS
   };
 
   let response;
@@ -355,7 +378,9 @@ exports.handler = async (event) => {
       statistics: extracted.statistics,
       meta: {
         model: DEFAULT_MODEL,
-        temperature: temperatureValidation.value
+        temperature: temperatureValidation.value,
+        maxOutputTokens: MAX_OUTPUT_TOKENS,
+        logprobCoverage: extracted.coverage
       }
     });
   } catch (error) {

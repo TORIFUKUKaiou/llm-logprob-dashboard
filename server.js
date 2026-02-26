@@ -7,6 +7,7 @@ const path = require('path');
 
 const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const DEFAULT_TEMPERATURE = 0.7;
+const DEFAULT_MAX_OUTPUT_TOKENS = parsePositiveInteger(process.env.MAX_OUTPUT_TOKENS, 220);
 const DEFAULT_TOP_LOGPROBS = Number.isInteger(Number(process.env.TOP_LOGPROBS))
   ? Number(process.env.TOP_LOGPROBS)
   : 5;
@@ -17,6 +18,11 @@ const LOGPROB_INCLUDE_PATH = 'message.output_text.logprobs';
 
 function buildAppError(type, message, status) {
   return { type, message, status };
+}
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function roundTo(value, digits) {
@@ -99,6 +105,10 @@ async function callOpenAIResponses(prompt, temperature = DEFAULT_TEMPERATURE, op
   const topLogprobs = Number.isInteger(options.topLogprobs)
     ? options.topLogprobs
     : DEFAULT_TOP_LOGPROBS;
+  const maxOutputTokens = parsePositiveInteger(
+    options.maxOutputTokens,
+    DEFAULT_MAX_OUTPUT_TOKENS
+  );
   const fetchImpl = options.fetchImpl || global.fetch;
 
   if (!apiKey) {
@@ -119,7 +129,8 @@ async function callOpenAIResponses(prompt, temperature = DEFAULT_TEMPERATURE, op
     ],
     temperature,
     include: [LOGPROB_INCLUDE_PATH],
-    top_logprobs: topLogprobs
+    top_logprobs: topLogprobs,
+    max_output_tokens: maxOutputTokens
   };
 
   let response;
@@ -265,11 +276,27 @@ function extractLogprobs(openaiResponse) {
       };
     });
 
+    const coveredChars = tokens.reduce((total, tokenEntry) => {
+      return total + (typeof tokenEntry.token === 'string' ? tokenEntry.token.length : 0);
+    }, 0);
+    const totalChars = generatedText.length;
+    const normalizedCoveredChars = totalChars > 0
+      ? Math.min(coveredChars, totalChars)
+      : 0;
+    const coverageRatio = totalChars > 0
+      ? roundTo(normalizedCoveredChars / totalChars, 4)
+      : null;
+
     return {
       success: true,
       text: generatedText,
       tokens,
-      statistics: calculateStatisticsFromValues(rawLogprobValues)
+      statistics: calculateStatisticsFromValues(rawLogprobValues),
+      coverage: {
+        coveredChars: normalizedCoveredChars,
+        totalChars,
+        ratio: coverageRatio
+      }
     };
   } catch (error) {
     return {
@@ -324,6 +351,10 @@ function createGenerateHandler(options = {}) {
   const configuredTopLogprobs = Number.isInteger(options.topLogprobs)
     ? options.topLogprobs
     : DEFAULT_TOP_LOGPROBS;
+  const configuredMaxOutputTokens = parsePositiveInteger(
+    options.maxOutputTokens,
+    DEFAULT_MAX_OUTPUT_TOKENS
+  );
   const configuredApiKey =
     Object.prototype.hasOwnProperty.call(options, 'apiKey')
       ? options.apiKey
@@ -358,7 +389,8 @@ function createGenerateHandler(options = {}) {
           apiKey: configuredApiKey,
           fetchImpl,
           model: configuredModel,
-          topLogprobs: configuredTopLogprobs
+          topLogprobs: configuredTopLogprobs,
+          maxOutputTokens: configuredMaxOutputTokens
         }
       );
 
@@ -376,7 +408,9 @@ function createGenerateHandler(options = {}) {
         statistics: extracted.statistics,
         meta: {
           model: configuredModel,
-          temperature: temperatureValidation.value
+          temperature: temperatureValidation.value,
+          maxOutputTokens: configuredMaxOutputTokens,
+          logprobCoverage: extracted.coverage
         }
       });
     } catch (error) {
@@ -427,6 +461,7 @@ if (require.main === module) {
 
 module.exports = {
   DEFAULT_MODEL,
+  DEFAULT_MAX_OUTPUT_TOKENS,
   DEFAULT_TEMPERATURE,
   DEFAULT_TOP_LOGPROBS,
   LOGPROB_INCLUDE_PATH,

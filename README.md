@@ -52,6 +52,8 @@ PORT=3000
 # Optional (default: gpt-4o-mini)
 OPENAI_MODEL=gpt-4o-mini
 TOP_LOGPROBS=5
+# Optional (default: 220)
+MAX_OUTPUT_TOKENS=220
 ```
 
 **重要**: `.env`ファイルは`.gitignore`に含まれており、リポジトリにコミットされません。
@@ -90,7 +92,8 @@ APIキーは CloudFormation パラメータ（NoEcho）で渡します。
 npm run cdk:deploy -- \
   --parameters OpenAiApiKey=your_openai_api_key_here \
   --parameters OpenAiModel=gpt-4o-mini \
-  --parameters TopLogprobs=5
+  --parameters TopLogprobs=5 \
+  --parameters MaxOutputTokens=220
 ```
 
 ### 3. 確認
@@ -194,7 +197,13 @@ llm-logprob-dashboard/
   },
   "meta": {
     "model": "gpt-4o-mini",
-    "temperature": 0.7
+    "temperature": 0.7,
+    "maxOutputTokens": 220,
+    "logprobCoverage": {
+      "coveredChars": 128,
+      "totalChars": 156,
+      "ratio": 0.8205
+    }
   }
 }
 ```

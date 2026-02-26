@@ -41,6 +41,13 @@ describe('POST /api/generate handler', () => {
     assert.strictEqual(res.statusCode, 200);
     assert.strictEqual(res.body.meta.temperature, 0);
     assert.strictEqual(res.body.meta.model, 'gpt-4o-mini');
+    assert.strictEqual(res.body.meta.maxOutputTokens, 220);
+    assert.deepStrictEqual(Object.keys(res.body.meta.logprobCoverage), [
+      'coveredChars',
+      'totalChars',
+      'ratio'
+    ]);
+    assert.strictEqual(typeof res.body.meta.logprobCoverage.ratio, 'number');
     assert.strictEqual(typeof res.body.generatedText, 'string');
     assert.ok(Array.isArray(res.body.tokens));
     assert.ok(res.body.tokens.length > 0);
