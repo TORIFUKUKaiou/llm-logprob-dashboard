@@ -529,6 +529,22 @@ body {
   padding: 0.65rem;
 }
 
+.history-item-clickable {
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.history-item-clickable:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 4px 4px 0 var(--line);
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.95), rgba(0, 194, 255, 0.2));
+}
+
+.history-item-clickable:focus-visible {
+  outline: 3px solid var(--accent-cold);
+  outline-offset: 3px;
+}
+
 .history-meta {
   margin: 0;
   font-size: 0.78rem;

@@ -23,6 +23,8 @@ const topLogprobsList = document.getElementById('top-logprobs-list');
 
 const MAX_HISTORY_ITEMS = 3;
 const LOGPROB_WARNING_THRESHOLD = -2.0;
+const DEFAULT_TEMPERATURE = 0.7;
+const HISTORY_STORAGE_KEY = 'llm-logprob-dashboard-history-v1';
 let chart = null;
 let history = [];
 let currentTokens = [];
@@ -73,6 +75,135 @@ function probabilityFromLogprob(logprob) {
     return 0;
   }
   return Math.exp(logprob);
+}
+
+function createHistoryId() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function toFiniteNumber(value, fallback = null) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeStoredPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const tokens = Array.isArray(payload.tokens)
+    ? payload.tokens
+        .map((tokenEntry, index) => {
+          if (!tokenEntry || typeof tokenEntry !== 'object') {
+            return null;
+          }
+
+          const token = typeof tokenEntry.token === 'string' ? tokenEntry.token : '';
+          const logprob = toFiniteNumber(tokenEntry.logprob, null);
+          if (logprob === null) {
+            return null;
+          }
+
+          const topLogprobs = Array.isArray(tokenEntry.topLogprobs)
+            ? tokenEntry.topLogprobs
+                .map((candidate) => {
+                  if (!candidate || typeof candidate !== 'object') {
+                    return null;
+                  }
+                  const candidateToken = typeof candidate.token === 'string' ? candidate.token : '';
+                  const candidateLogprob = toFiniteNumber(candidate.logprob, null);
+                  if (candidateLogprob === null) {
+                    return null;
+                  }
+                  return {
+                    token: candidateToken,
+                    logprob: candidateLogprob
+                  };
+                })
+                .filter(Boolean)
+            : [];
+
+          return {
+            index,
+            token,
+            logprob,
+            topLogprobs
+          };
+        })
+        .filter(Boolean)
+    : [];
+
+  const averageLogprob = toFiniteNumber(payload.statistics && payload.statistics.averageLogprob, null);
+  const perplexity = toFiniteNumber(payload.statistics && payload.statistics.perplexity, null);
+  const model = payload.meta && typeof payload.meta.model === 'string'
+    ? payload.meta.model
+    : '-';
+
+  return {
+    generatedText: typeof payload.generatedText === 'string' ? payload.generatedText : '',
+    tokens,
+    statistics: {
+      averageLogprob,
+      perplexity
+    },
+    meta: {
+      model
+    }
+  };
+}
+
+function normalizeStoredHistoryItem(item) {
+  if (!item || typeof item !== 'object') {
+    return null;
+  }
+
+  const payload = normalizeStoredPayload(item.payload);
+  if (!payload) {
+    return null;
+  }
+
+  return {
+    id: typeof item.id === 'string' ? item.id : createHistoryId(),
+    time: typeof item.time === 'string' ? item.time : new Date().toLocaleTimeString(),
+    prompt: typeof item.prompt === 'string' ? item.prompt : '',
+    temperature: toFiniteNumber(item.temperature, DEFAULT_TEMPERATURE),
+    payload
+  };
+}
+
+function loadHistoryFromStorage() {
+  if (!window.localStorage) {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(HISTORY_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map((item) => normalizeStoredHistoryItem(item))
+      .filter(Boolean)
+      .slice(0, MAX_HISTORY_ITEMS);
+  } catch (_error) {
+    return [];
+  }
+}
+
+function persistHistoryToStorage() {
+  if (!window.localStorage) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
+  } catch (_error) {
+    // Fall back to in-memory history when browser storage is unavailable.
+  }
 }
 
 async function sha256Hex(value) {
@@ -338,36 +469,72 @@ function renderHistory() {
   }
 
   history.forEach((item) => {
+    const snippet = item.payload.generatedText.replace(/\s+/g, ' ').trim();
+    const promptPreview = item.prompt.length > 42 ? `${item.prompt.slice(0, 42)}...` : item.prompt;
+
     const card = document.createElement('article');
-    card.className = 'history-item reveal';
+    card.className = 'history-item history-item-clickable reveal';
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', `Restore run from ${item.time}`);
 
     const meta = document.createElement('p');
     meta.className = 'history-meta';
-    meta.textContent = `${item.time} | temp ${item.temperature} | ppl ${item.perplexity}`;
+    meta.textContent = `${item.time} | temp ${formatNumber(item.temperature, 1, '-')} | ppl ${formatNumber(item.payload.statistics.perplexity, 2, '-')}`;
 
     const main = document.createElement('p');
     main.className = 'history-main';
-    main.textContent = item.prompt;
+    main.textContent = promptPreview || '[empty prompt]';
 
     const excerpt = document.createElement('p');
     excerpt.className = 'history-text';
-    excerpt.textContent = item.text;
+    excerpt.textContent = snippet.length > 110 ? `${snippet.slice(0, 110)}...` : (snippet || '[no generated text]');
+
+    card.addEventListener('click', () => {
+      restoreFromHistory(item);
+    });
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        restoreFromHistory(item);
+      }
+    });
 
     card.append(meta, main, excerpt);
     historyList.appendChild(card);
   });
 }
 
+function restoreFromHistory(item) {
+  const normalizedItem = normalizeStoredHistoryItem(item);
+  if (!normalizedItem) {
+    setStatus('Failed to restore the selected run.', 'error');
+    return;
+  }
+
+  promptInput.value = normalizedItem.prompt;
+  temperatureInput.value = String(normalizedItem.temperature);
+  temperatureValue.textContent = Number(normalizedItem.temperature).toFixed(1);
+  renderResult(normalizedItem.payload, normalizedItem.temperature);
+  setStatus('Restored from Recent Runs.', 'info');
+  resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function pushHistoryItem(payload, prompt, temperature) {
-  const snippet = payload.generatedText.replace(/\s+/g, ' ').trim();
+  const normalizedPayload = normalizeStoredPayload(payload);
+  if (!normalizedPayload) {
+    return;
+  }
+
   history.unshift({
+    id: createHistoryId(),
     time: new Date().toLocaleTimeString(),
-    prompt: prompt.length > 42 ? `${prompt.slice(0, 42)}...` : prompt,
-    text: snippet.length > 110 ? `${snippet.slice(0, 110)}...` : snippet,
-    temperature: formatNumber(temperature, 1, '-'),
-    perplexity: formatNumber(payload.statistics.perplexity, 2, '-')
+    prompt,
+    temperature: toFiniteNumber(temperature, DEFAULT_TEMPERATURE),
+    payload: normalizedPayload
   });
   history = history.slice(0, MAX_HISTORY_ITEMS);
+  persistHistoryToStorage();
   renderHistory();
 }
 
@@ -472,6 +639,7 @@ temperatureInput.addEventListener('input', () => {
 
 clearHistoryButton.addEventListener('click', () => {
   history = [];
+  persistHistoryToStorage();
   renderHistory();
   setStatus('History cleared.', 'info');
 });
@@ -480,4 +648,5 @@ window.addEventListener('beforeunload', () => {
   destroyChartIfExists();
 });
 
+history = loadHistoryFromStorage();
 renderHistory();
