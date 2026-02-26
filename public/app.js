@@ -22,15 +22,21 @@ const topLogprobsContent = document.getElementById('top-logprobs-content');
 const selectedTokenText = document.getElementById('selected-token-text');
 const selectedTokenMeta = document.getElementById('selected-token-meta');
 const topLogprobsList = document.getElementById('top-logprobs-list');
+const cosmoStage = document.getElementById('cosmo-stage');
+const cosmoStars = document.getElementById('cosmo-stars');
 
 const MAX_HISTORY_ITEMS = 3;
 const LOGPROB_WARNING_THRESHOLD = -2.0;
 const DEFAULT_TEMPERATURE = 0.7;
 const HISTORY_STORAGE_KEY = 'llm-logprob-dashboard-history-v1';
+const COSMO_STAR_LIMIT = 120;
+const reduceMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 let chart = null;
 let history = [];
 let currentTokens = [];
 let selectedTokenIndex = null;
+let cosmoStarIntervalId = null;
+let cosmoCleanupTimerId = null;
 
 function formatNumber(value, digits, fallback = '--') {
   return typeof value === 'number' && Number.isFinite(value)
@@ -44,7 +50,125 @@ function setStatus(message, variant = 'info') {
   statusMessage.classList.add(`status-${variant}`);
 }
 
-function setLoading(isLoading) {
+function setCosmoAnchorFromButton() {
+  if (!generateButton || !document.body) {
+    return;
+  }
+
+  const buttonRect = generateButton.getBoundingClientRect();
+  const anchorX = buttonRect.left + buttonRect.width / 2;
+  const anchorY = buttonRect.top + buttonRect.height / 2;
+  document.body.style.setProperty('--cosmo-x', `${anchorX}px`);
+  document.body.style.setProperty('--cosmo-y', `${anchorY}px`);
+}
+
+function clearCosmoInterval() {
+  if (cosmoStarIntervalId !== null) {
+    window.clearInterval(cosmoStarIntervalId);
+    cosmoStarIntervalId = null;
+  }
+}
+
+function spawnCosmoStar(intensity = 1) {
+  if (!cosmoStars || reduceMotionQuery.matches) {
+    return;
+  }
+
+  const angle = Math.random() * Math.PI * 2;
+  const speed = 80 + Math.random() * 240 * intensity;
+  const dx = Math.cos(angle) * speed;
+  const dy = Math.sin(angle) * speed;
+  const size = 1.8 + Math.random() * 3.2 * intensity;
+  const originJitter = 1.8 * intensity;
+
+  const star = document.createElement('span');
+  star.className = 'cosmo-star';
+  star.style.left = `calc(var(--cosmo-x, 50vw) + ${(Math.random() - 0.5) * originJitter}vw)`;
+  star.style.top = `calc(var(--cosmo-y, 34vh) + ${(Math.random() - 0.5) * originJitter}vh)`;
+  star.style.width = `${size}px`;
+  star.style.height = `${size}px`;
+  star.style.setProperty('--dx', `${dx}px`);
+  star.style.setProperty('--dy', `${dy}px`);
+  star.style.setProperty('--dur', `${620 + Math.random() * 620}ms`);
+  cosmoStars.appendChild(star);
+
+  if (cosmoStars.childElementCount > COSMO_STAR_LIMIT) {
+    const overflow = cosmoStars.childElementCount - COSMO_STAR_LIMIT;
+    for (let i = 0; i < overflow; i += 1) {
+      if (cosmoStars.firstElementChild) {
+        cosmoStars.firstElementChild.remove();
+      }
+    }
+  }
+
+  window.setTimeout(() => {
+    star.remove();
+  }, 1600);
+}
+
+function burstCosmoStars(count, intensity = 1) {
+  for (let i = 0; i < count; i += 1) {
+    spawnCosmoStar(intensity);
+  }
+}
+
+function startCosmoCharge() {
+  if (!document.body || !cosmoStage) {
+    return;
+  }
+
+  window.clearTimeout(cosmoCleanupTimerId);
+  clearCosmoInterval();
+  document.body.classList.remove('cosmo-impact', 'cosmo-fizzle');
+  document.body.classList.add('cosmo-active');
+  generateButton.classList.remove('cosmo-impact');
+  generateButton.classList.add('cosmo-charging');
+  setCosmoAnchorFromButton();
+
+  if (reduceMotionQuery.matches) {
+    return;
+  }
+
+  burstCosmoStars(20, 1);
+  cosmoStarIntervalId = window.setInterval(() => {
+    burstCosmoStars(3, 1);
+  }, 120);
+}
+
+function stopCosmoCharge(outcome = 'neutral') {
+  if (!document.body || !cosmoStage) {
+    return;
+  }
+
+  clearCosmoInterval();
+  generateButton.classList.remove('cosmo-charging');
+
+  if (outcome === 'success') {
+    document.body.classList.remove('cosmo-fizzle');
+    document.body.classList.add('cosmo-impact');
+    generateButton.classList.remove('cosmo-impact');
+    void generateButton.offsetWidth;
+    generateButton.classList.add('cosmo-impact');
+    burstCosmoStars(36, 1.4);
+  } else if (outcome === 'error') {
+    document.body.classList.remove('cosmo-impact');
+    document.body.classList.add('cosmo-fizzle');
+    burstCosmoStars(16, 0.8);
+  } else {
+    document.body.classList.remove('cosmo-impact', 'cosmo-fizzle');
+  }
+
+  document.body.classList.remove('cosmo-active');
+  cosmoCleanupTimerId = window.setTimeout(() => {
+    document.body.classList.remove('cosmo-impact', 'cosmo-fizzle');
+    generateButton.classList.remove('cosmo-impact');
+    if (cosmoStars) {
+      cosmoStars.innerHTML = '';
+    }
+  }, 900);
+}
+
+function setLoading(isLoading, outcome = 'neutral') {
   generateButton.disabled = isLoading;
   promptInput.disabled = isLoading;
   temperatureInput.disabled = isLoading;
@@ -52,8 +176,10 @@ function setLoading(isLoading) {
   if (isLoading) {
     generateButton.textContent = 'Analyzing...';
     setStatus('Requesting OpenAI and parsing token logprobs...', 'info');
+    startCosmoCharge();
   } else {
     generateButton.textContent = 'Generate + Analyze';
+    stopCosmoCharge(outcome);
   }
 }
 
@@ -708,6 +834,7 @@ form.addEventListener('submit', async (event) => {
     return;
   }
 
+  let generationOutcome = 'neutral';
   setLoading(true);
 
   try {
@@ -716,10 +843,12 @@ form.addEventListener('submit', async (event) => {
     renderResult(payload, temperature);
     pushHistoryItem(payload, prompt, temperature);
     setStatus('Analysis complete.', 'success');
+    generationOutcome = 'success';
   } catch (error) {
     setStatus(error.message, 'error');
+    generationOutcome = 'error';
   } finally {
-    setLoading(false);
+    setLoading(false, generationOutcome);
   }
 });
 
