@@ -20,6 +20,7 @@ pids
 # Coverage directory
 coverage/
 .nyc_output/
+cdk.out/
 
 # Optional npm cache directory
 .npm

@@ -1,17 +1,10 @@
-// LLM Logprob Dashboard backend
-// OpenAI Responses API integration, logprob extraction, and metrics API.
-
-require('dotenv').config({ quiet: true });
-const express = require('express');
-const path = require('path');
-
 const DEFAULT_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const DEFAULT_TEMPERATURE = 0.7;
-const DEFAULT_TOP_LOGPROBS = Number.isInteger(Number(process.env.TOP_LOGPROBS))
-  ? Number(process.env.TOP_LOGPROBS)
-  : 5;
 const MIN_TEMPERATURE = 0.0;
 const MAX_TEMPERATURE = 2.0;
+const TOP_LOGPROBS = Number.isInteger(Number(process.env.TOP_LOGPROBS))
+  ? Number(process.env.TOP_LOGPROBS)
+  : 5;
 const OPENAI_RESPONSES_ENDPOINT = 'https://api.openai.com/v1/responses';
 const LOGPROB_INCLUDE_PATH = 'message.output_text.logprobs';
 
@@ -21,6 +14,17 @@ function buildAppError(type, message, status) {
 
 function roundTo(value, digits) {
   return parseFloat(value.toFixed(digits));
+}
+
+function jsonResponse(statusCode, payload) {
+  return {
+    statusCode,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store'
+    },
+    body: JSON.stringify(payload)
+  };
 }
 
 function validatePrompt(prompt) {
@@ -93,85 +97,12 @@ function normalizeTopLogprobs(topLogprobs) {
     .filter(Boolean);
 }
 
-async function callOpenAIResponses(prompt, temperature = DEFAULT_TEMPERATURE, options = {}) {
-  const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
-  const model = options.model || DEFAULT_MODEL;
-  const topLogprobs = Number.isInteger(options.topLogprobs)
-    ? options.topLogprobs
-    : DEFAULT_TOP_LOGPROBS;
-  const fetchImpl = options.fetchImpl || global.fetch;
-
-  if (!apiKey) {
-    throw buildAppError('CONFIG_ERROR', 'OPENAI_API_KEY is not configured');
-  }
-
-  if (typeof fetchImpl !== 'function') {
-    throw buildAppError('CONFIG_ERROR', 'Fetch implementation is not available');
-  }
-
-  const requestBody = {
-    model,
-    input: [
-      {
-        role: 'user',
-        content: [{ type: 'input_text', text: prompt }]
-      }
-    ],
-    temperature,
-    include: [LOGPROB_INCLUDE_PATH],
-    top_logprobs: topLogprobs
-  };
-
-  let response;
-  try {
-    response = await fetchImpl(OPENAI_RESPONSES_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify(requestBody)
-    });
-  } catch (error) {
-    const appError = buildAppError('OPENAI_ERROR', 'Failed to connect to OpenAI API');
-    appError.cause = error;
-    throw appError;
-  }
-
-  if (!response.ok) {
-    let errorMessage = 'OpenAI API request failed';
-    if (response.status === 401) {
-      errorMessage = 'Authentication failed - check API key';
-    } else if (response.status === 429) {
-      errorMessage = 'Rate limit exceeded - please try again later';
-    } else if (response.status >= 500) {
-      errorMessage = 'OpenAI service error - please try again';
-    }
-
-    throw buildAppError('OPENAI_ERROR', errorMessage, response.status);
-  }
-
-  try {
-    return await response.json();
-  } catch (error) {
-    const appError = buildAppError('OPENAI_ERROR', 'OpenAI API returned invalid JSON', response.status);
-    appError.cause = error;
-    throw appError;
-  }
-}
-
 function calculateStatisticsFromValues(logprobValues) {
   if (!Array.isArray(logprobValues) || logprobValues.length === 0) {
     return {
       averageLogprob: null,
       perplexity: null
     };
-  }
-
-  for (const value of logprobValues) {
-    if (!Number.isFinite(value)) {
-      throw new Error('logprob values must be finite numbers');
-    }
   }
 
   const sum = logprobValues.reduce((acc, value) => acc + value, 0);
@@ -184,19 +115,6 @@ function calculateStatisticsFromValues(logprobValues) {
   };
 }
 
-function calculateStatistics(tokens) {
-  if (!Array.isArray(tokens) || tokens.length === 0) {
-    return {
-      averageLogprob: null,
-      perplexity: null
-    };
-  }
-
-  const logprobValues = tokens.map((token) => Number(token && token.logprob));
-  return calculateStatisticsFromValues(logprobValues);
-}
-
-// Extracts generated text and per-token logprobs from Responses API response.
 function extractLogprobs(openaiResponse) {
   try {
     if (!openaiResponse || !Array.isArray(openaiResponse.output)) {
@@ -279,6 +197,55 @@ function extractLogprobs(openaiResponse) {
   }
 }
 
+async function callOpenAIResponses(prompt, temperature) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw buildAppError('CONFIG_ERROR', 'OPENAI_API_KEY is not configured');
+  }
+
+  const requestBody = {
+    model: DEFAULT_MODEL,
+    input: [
+      {
+        role: 'user',
+        content: [{ type: 'input_text', text: prompt }]
+      }
+    ],
+    temperature,
+    include: [LOGPROB_INCLUDE_PATH],
+    top_logprobs: TOP_LOGPROBS
+  };
+
+  let response;
+  try {
+    response = await fetch(OPENAI_RESPONSES_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(requestBody)
+    });
+  } catch (_error) {
+    throw buildAppError('OPENAI_ERROR', 'Failed to connect to OpenAI API');
+  }
+
+  if (!response.ok) {
+    let errorMessage = 'OpenAI API request failed';
+    if (response.status === 401) {
+      errorMessage = 'Authentication failed - check API key';
+    } else if (response.status === 429) {
+      errorMessage = 'Rate limit exceeded - please try again later';
+    } else if (response.status >= 500) {
+      errorMessage = 'OpenAI service error - please try again';
+    }
+
+    throw buildAppError('OPENAI_ERROR', errorMessage, response.status);
+  }
+
+  return response.json();
+}
+
 function mapErrorToHttpResponse(error) {
   if (error && error.type === 'VALIDATION_ERROR') {
     return {
@@ -319,24 +286,43 @@ function mapErrorToHttpResponse(error) {
   };
 }
 
-function createGenerateHandler(options = {}) {
-  const configuredModel = options.model || DEFAULT_MODEL;
-  const configuredTopLogprobs = Number.isInteger(options.topLogprobs)
-    ? options.topLogprobs
-    : DEFAULT_TOP_LOGPROBS;
-  const configuredApiKey =
-    Object.prototype.hasOwnProperty.call(options, 'apiKey')
-      ? options.apiKey
-      : process.env.OPENAI_API_KEY;
-  const fetchImpl = options.fetchImpl || global.fetch;
+function parseRequestBody(event) {
+  if (!event || !event.body) {
+    return {};
+  }
 
-  return async (req, res) => {
-    const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const bodyRaw = event.isBase64Encoded
+    ? Buffer.from(event.body, 'base64').toString('utf8')
+    : event.body;
+
+  try {
+    const body = JSON.parse(bodyRaw);
+    return body && typeof body === 'object' ? body : {};
+  } catch (_error) {
+    throw buildAppError('VALIDATION_ERROR', 'Request body must be valid JSON');
+  }
+}
+
+exports.handler = async (event) => {
+  const method = event && event.requestContext && event.requestContext.http
+    ? event.requestContext.http.method
+    : 'GET';
+  const path = event && typeof event.rawPath === 'string' ? event.rawPath : '/';
+
+  if (method !== 'POST' || path !== '/api/generate') {
+    return jsonResponse(404, {
+      error: 'Not found',
+      code: 'NOT_FOUND'
+    });
+  }
+
+  try {
+    const body = parseRequestBody(event);
     const { prompt, temperature } = body;
 
     const promptValidation = validatePrompt(prompt);
     if (!promptValidation.valid) {
-      return res.status(400).json({
+      return jsonResponse(400, {
         error: promptValidation.error,
         code: promptValidation.code
       });
@@ -344,103 +330,44 @@ function createGenerateHandler(options = {}) {
 
     const temperatureValidation = validateTemperature(temperature);
     if (!temperatureValidation.valid) {
-      return res.status(400).json({
+      return jsonResponse(400, {
         error: temperatureValidation.error,
         code: temperatureValidation.code
       });
     }
 
-    try {
-      const openaiResponse = await callOpenAIResponses(
-        promptValidation.value,
-        temperatureValidation.value,
-        {
-          apiKey: configuredApiKey,
-          fetchImpl,
-          model: configuredModel,
-          topLogprobs: configuredTopLogprobs
-        }
-      );
+    const openaiResponse = await callOpenAIResponses(
+      promptValidation.value,
+      temperatureValidation.value
+    );
 
-      const extracted = extractLogprobs(openaiResponse);
-      if (!extracted.success) {
-        return res.status(500).json({
-          error: extracted.error,
-          code: 'PARSE_ERROR'
-        });
+    const extracted = extractLogprobs(openaiResponse);
+    if (!extracted.success) {
+      return jsonResponse(500, {
+        error: extracted.error,
+        code: 'PARSE_ERROR'
+      });
+    }
+
+    return jsonResponse(200, {
+      generatedText: extracted.text,
+      tokens: extracted.tokens,
+      statistics: extracted.statistics,
+      meta: {
+        model: DEFAULT_MODEL,
+        temperature: temperatureValidation.value
       }
-
-      return res.json({
-        generatedText: extracted.text,
-        tokens: extracted.tokens,
-        statistics: extracted.statistics,
-        meta: {
-          model: configuredModel,
-          temperature: temperatureValidation.value
-        }
-      });
-    } catch (error) {
-      const mappedError = mapErrorToHttpResponse(error);
-
-      console.error('API Error:', {
-        code: mappedError.errorCode,
-        originalStatus: error && error.status,
-        message: error && error.message
-      });
-
-      return res.status(mappedError.statusCode).json({
-        error: mappedError.errorMessage,
-        code: mappedError.errorCode
-      });
-    }
-  };
-}
-
-function createApp(options = {}) {
-  const app = express();
-
-  app.use(express.json());
-  app.use(express.static(path.join(__dirname, 'public')));
-  app.post('/api/generate', createGenerateHandler(options));
-
-  return app;
-}
-
-function startServer(options = {}) {
-  const app = createApp(options);
-  const port = options.port || process.env.PORT || 3000;
-
-  const server = app.listen(port, () => {
-    console.log(`LLM Logprob Dashboard server running on http://localhost:${port}`);
-    console.log('Ready to visualize token-level log probabilities.');
-    if (!process.env.OPENAI_API_KEY) {
-      console.warn('OPENAI_API_KEY is not configured. /api/generate will return CONFIG_ERROR.');
-    }
-  });
-
-  return server;
-}
-
-if (require.main === module) {
-  startServer();
-}
-
-module.exports = {
-  DEFAULT_MODEL,
-  DEFAULT_TEMPERATURE,
-  DEFAULT_TOP_LOGPROBS,
-  LOGPROB_INCLUDE_PATH,
-  OPENAI_RESPONSES_ENDPOINT,
-  calculateStatistics,
-  calculateStatisticsFromValues,
-  callOpenAIResponses,
-  createApp,
-  createGenerateHandler,
-  extractLogprobs,
-  mapErrorToHttpResponse,
-  normalizeTopLogprobs,
-  roundTo,
-  startServer,
-  validatePrompt,
-  validateTemperature
+    });
+  } catch (error) {
+    const mappedError = mapErrorToHttpResponse(error);
+    console.error('Lambda API Error:', {
+      code: mappedError.errorCode,
+      originalStatus: error && error.status,
+      message: error && error.message
+    });
+    return jsonResponse(mappedError.statusCode, {
+      error: mappedError.errorMessage,
+      code: mappedError.errorCode
+    });
+  }
 };
